@@ -346,6 +346,7 @@
       let kickEnvelope = 0;
       let bassAvg = 0;
       let lastKickTime = 0;
+      let volumeSmoothed = 0;
       let freqData = null;
       let waveData = null;
       let errorTimeout = null;
@@ -422,6 +423,27 @@
         return sum / (bassBins * 255);
       }
 
+      function getVolumeLevel() {
+        if (!analyser) return 0;
+
+        analyser.getByteTimeDomainData(waveData);
+
+        let sumSq = 0;
+        for (let i = 0; i < waveData.length; i++) {
+          const v = (waveData[i] - 128) / 128;
+          sumSq += v * v;
+        }
+        const rms = Math.sqrt(sumSq / waveData.length);
+
+        let spectral = 0;
+        for (let i = 0; i < freqData.length; i++) spectral += freqData[i];
+        spectral /= freqData.length * 255;
+
+        const level = Math.max(rms, spectral * 0.7);
+        volumeSmoothed += (level - volumeSmoothed) * 0.1;
+        return volumeSmoothed;
+      }
+
       function detectKick(bass) {
         bassAvg += (bass - bassAvg) * 0.04;
         const now = performance.now();
@@ -439,40 +461,46 @@
         return kickEnvelope;
       }
 
-      function drawWaveform(cx, cy, w, h, kick) {
+      function drawWaveform(cx, cy, w, h, kick, volume) {
         if (!analyser || !isPlaying) return;
 
-        analyser.getByteTimeDomainData(waveData);
-        const waveW = Math.min(w, 520);
-        const amp = Math.min(w, h) * 0.045;
+        const waveW = w * 0.78;
+        const baseAmp = Math.min(w, h) * 0.055;
+        const amp = baseAmp * (0.55 + volume * 2.2 + kick * 0.45);
         const startX = cx - waveW / 2;
-        const step = waveW / waveData.length;
-        const alpha = 0.08 + kick * 0.35;
+        const points = 120;
+        const slice = Math.floor(waveData.length / points);
+        const alpha = 0.16 + volume * 0.5 + kick * 0.2;
 
-        function buildPath(sign) {
+        function sampleY(index) {
+          let avg = 0;
+          const start = index * slice;
+          for (let j = 0; j < slice; j++) avg += waveData[start + j];
+          return ((avg / slice) - 128) / 128;
+        }
+
+        function drawMirror(sign) {
           ctx.beginPath();
-          for (let i = 0; i < waveData.length; i++) {
-            const v = (waveData[i] - 128) / 128;
-            const x = startX + i * step;
-            const y = cy + v * amp * sign * (0.25 + kick * 0.75);
+          for (let i = 0; i < points; i++) {
+            const x = startX + (i / (points - 1)) * waveW;
+            const y = cy + sampleY(i) * amp * sign;
             if (i === 0) ctx.moveTo(x, y);
             else ctx.lineTo(x, y);
           }
+          ctx.stroke();
         }
 
         ctx.save();
-        ctx.strokeStyle = `rgba(130, 130, 135, ${alpha})`;
-        ctx.lineWidth = 0.7 + kick * 0.8;
-        ctx.shadowColor = `rgba(100, 100, 110, ${kick * 0.4})`;
-        ctx.shadowBlur = 8 + kick * 16;
-        buildPath(1);
-        ctx.stroke();
-        buildPath(-1);
-        ctx.stroke();
+        ctx.strokeStyle = `rgba(125, 125, 130, ${alpha})`;
+        ctx.lineWidth = 0.8 + volume * 0.6 + kick * 0.5;
+        ctx.shadowColor = `rgba(110, 110, 120, ${0.15 + kick * 0.35})`;
+        ctx.shadowBlur = 6 + kick * 14;
+        drawMirror(1);
+        drawMirror(-1);
 
-        ctx.strokeStyle = `rgba(90, 90, 95, ${alpha * 0.5})`;
-        ctx.lineWidth = 0.4;
         ctx.shadowBlur = 0;
+        ctx.strokeStyle = `rgba(85, 85, 90, ${0.08 + volume * 0.2})`;
+        ctx.lineWidth = 0.35;
         ctx.beginPath();
         ctx.moveTo(startX, cy);
         ctx.lineTo(startX + waveW, cy);
@@ -490,12 +518,13 @@
 
         const bass = isPlaying ? getBassLevel() : 0;
         const kick = isPlaying ? detectKick(bass) : 0;
+        const volume = isPlaying ? getVolumeLevel() : 0;
 
         const baseRadius = Math.min(w, h) * 0.12;
         const hitExpand = kick * Math.min(w, h) * 0.14;
         const pulseRadius = baseRadius + hitExpand;
 
-        drawWaveform(cx, cy, w, h, kick);
+        drawWaveform(cx, cy, w, h, kick, volume);
 
         if (kick > 0.02) {
           for (let i = 3; i >= 1; i--) {
@@ -584,6 +613,7 @@
         kickEnvelope = 0;
         bassAvg = 0;
         lastKickTime = 0;
+        volumeSmoothed = 0;
         setPlayingUI(false);
       }
 
