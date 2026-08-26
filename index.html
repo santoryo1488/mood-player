@@ -252,6 +252,76 @@
       letter-spacing: 0.05em;
     }
 
+    .volume-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: 0.35rem;
+      height: 28px;
+    }
+
+    .volume-btn {
+      flex-shrink: 0;
+      width: 28px;
+      height: 28px;
+      border: none;
+      background: transparent;
+      color: var(--fg-bright);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      transition: color 0.25s;
+    }
+
+    .volume-btn:hover { color: #d0d0d0; }
+
+    .volume-btn svg {
+      width: 15px;
+      height: 15px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 1.2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .volume-track-wrap {
+      width: 0;
+      overflow: hidden;
+      opacity: 0;
+      transition: width 0.28s ease, opacity 0.22s ease, margin 0.28s ease;
+      margin-left: 0;
+    }
+
+    .volume-wrap:hover .volume-track-wrap,
+    .volume-wrap:focus-within .volume-track-wrap {
+      width: 90px;
+      opacity: 1;
+      margin-left: 4px;
+    }
+
+    .volume-track {
+      width: 90px;
+      height: 2px;
+      background: var(--fg-dim);
+      cursor: pointer;
+      position: relative;
+      border-radius: 1px;
+    }
+
+    .volume-fill {
+      position: absolute;
+      left: 0;
+      top: 0;
+      height: 100%;
+      width: 85%;
+      background: var(--fg-bright);
+      border-radius: 1px;
+      pointer-events: none;
+    }
+
     .error-toast {
       position: fixed;
       bottom: 2rem;
@@ -351,6 +421,25 @@
         <span id="time-current">0:00</span>
         <span id="time-duration">0:00</span>
       </div>
+      <div class="volume-wrap" id="volume-wrap">
+        <button class="volume-btn" id="volume-btn" type="button" aria-label="Громкость">
+          <svg id="icon-volume" viewBox="0 0 24 24" aria-hidden="true">
+            <polygon points="11,5 6,9 2,9 2,15 6,15 11,19" fill="currentColor" stroke="none"/>
+            <path d="M15.5 8.5a5 5 0 0 1 0 7"/>
+            <path d="M18.5 5.5a9 9 0 0 1 0 13"/>
+          </svg>
+          <svg id="icon-muted" viewBox="0 0 24 24" aria-hidden="true" style="display:none">
+            <polygon points="11,5 6,9 2,9 2,15 6,15 11,19" fill="currentColor" stroke="none"/>
+            <line x1="16" y1="9" x2="22" y2="15"/>
+            <line x1="22" y1="9" x2="16" y2="15"/>
+          </svg>
+        </button>
+        <div class="volume-track-wrap">
+          <div class="volume-track" id="volume-track">
+            <div class="volume-fill" id="volume-fill"></div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -372,6 +461,10 @@
       const timeDuration = document.getElementById('time-duration');
       const changeTrack = document.getElementById('btn-back');
       const errorToast = document.getElementById('error-toast');
+      const volumeTrack = document.getElementById('volume-track');
+      const volumeFill = document.getElementById('volume-fill');
+      const iconVolume = document.getElementById('icon-volume');
+      const iconMuted = document.getElementById('icon-muted');
       const canvas = document.getElementById('viz');
       const ctx = canvas.getContext('2d');
 
@@ -390,6 +483,8 @@
       let spectrumBars = null;
       const SPECTRUM_BARS = 96;
       let errorTimeout = null;
+      let volumeLevel = 0.85;
+      let volumeBeforeMute = 0.85;
 
       function showError(msg) {
         errorToast.textContent = msg;
@@ -397,6 +492,27 @@
         clearTimeout(errorTimeout);
         errorTimeout = setTimeout(() => errorToast.classList.remove('show'), 4000);
       }
+
+      function updateVolumeUI() {
+        if (!volumeFill) return;
+        volumeFill.style.width = (volumeLevel * 100) + '%';
+        const muted = volumeLevel === 0;
+        iconVolume.style.display = muted ? 'none' : 'block';
+        iconMuted.style.display = muted ? 'block' : 'none';
+      }
+
+      function applyVolume() {
+        if (audioElement) audioElement.volume = volumeLevel;
+        updateVolumeUI();
+      }
+
+      function setVolume(value) {
+        volumeLevel = Math.max(0, Math.min(1, value));
+        if (volumeLevel > 0) volumeBeforeMute = volumeLevel;
+        applyVolume();
+      }
+
+      updateVolumeUI();
 
       function formatTime(sec) {
         if (!isFinite(sec) || sec < 0) return '0:00';
@@ -725,6 +841,7 @@
         audioElement = new Audio();
         audioElement.src = objectUrl;
         audioElement.preload = 'auto';
+        audioElement.volume = volumeLevel;
 
         audioElement.addEventListener('loadedmetadata', () => {
           timeDuration.textContent = formatTime(audioElement.duration);
@@ -800,6 +917,20 @@
       }
 
       changeTrack.addEventListener('click', goBack);
+
+      volumeTrack.addEventListener('click', (e) => {
+        const rect = volumeTrack.getBoundingClientRect();
+        setVolume((e.clientX - rect.left) / rect.width);
+      });
+
+      document.getElementById('volume-btn').addEventListener('click', () => {
+        if (volumeLevel > 0) {
+          volumeBeforeMute = volumeLevel;
+          setVolume(0);
+        } else {
+          setVolume(volumeBeforeMute || 0.85);
+        }
+      });
 
       dropzone.addEventListener('dragover', (e) => {
         e.preventDefault();
