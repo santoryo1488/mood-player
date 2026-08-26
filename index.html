@@ -408,24 +408,40 @@
       width: 90px;
       opacity: 1;
       margin-left: 4px;
+      overflow: visible;
     }
 
     .volume-track {
       width: 90px;
-      height: 2px;
-      background: var(--fg-dim);
+      height: 14px;
+      background: transparent;
       cursor: pointer;
       position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .volume-track::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 50%;
+      height: 2px;
+      transform: translateY(-50%);
+      background: var(--fg-dim);
       border-radius: 1px;
+      pointer-events: none;
       animation: neon-pulse 4s ease-in-out infinite;
     }
 
     .volume-fill {
       position: absolute;
       left: 0;
-      top: 0;
-      height: 100%;
+      top: 50%;
+      height: 2px;
       width: 85%;
+      transform: translateY(-50%);
       background: #a8cce8;
       border-radius: 1px;
       pointer-events: none;
@@ -436,20 +452,17 @@
       position: absolute;
       top: 50%;
       left: 85%;
-      width: 6px;
-      height: 6px;
+      width: 8px;
+      height: 8px;
       border-radius: 50%;
-      background: #c8e4ff;
-      box-shadow: 0 0 8px rgba(120, 200, 255, 0.45);
+      background: #d8eeff;
+      border: 1px solid rgba(180, 220, 255, 0.9);
+      box-shadow: 0 0 8px rgba(120, 200, 255, 0.55);
       transform: translate(-50%, -50%);
       pointer-events: none;
-      opacity: 0;
-      transition: opacity 0.22s ease, left 0.06s linear;
-    }
-
-    .volume-wrap:hover .volume-thumb,
-    .volume-wrap:focus-within .volume-thumb {
+      z-index: 2;
       opacity: 1;
+      transition: left 0.04s linear;
     }
 
     .error-toast {
@@ -1090,6 +1103,7 @@
       timeline.addEventListener('mousedown', () => { isSeeking = true; seekDrag = true; });
       document.addEventListener('mouseup', () => {
         if (seekDrag) { isSeeking = false; seekDrag = false; }
+        volumeDragging = false;
       });
 
       function goBack() {
@@ -1102,9 +1116,21 @@
 
       changeTrack.addEventListener('click', goBack);
 
-      volumeTrack.addEventListener('click', (e) => {
+      function setVolumeFromPointer(clientX) {
         const rect = volumeTrack.getBoundingClientRect();
-        setVolume((e.clientX - rect.left) / rect.width);
+        setVolume((clientX - rect.left) / rect.width);
+      }
+
+      let volumeDragging = false;
+
+      volumeTrack.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        volumeDragging = true;
+        setVolumeFromPointer(e.clientX);
+      });
+
+      document.addEventListener('mousemove', (e) => {
+        if (volumeDragging) setVolumeFromPointer(e.clientX);
       });
 
       document.getElementById('volume-btn').addEventListener('click', () => {
