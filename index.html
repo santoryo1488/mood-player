@@ -145,6 +145,11 @@
       gap: 1.5rem;
       width: min(420px, 90vw);
       margin-top: 2rem;
+      padding: 1.25rem 1.5rem;
+      border: 1px solid rgba(120, 120, 120, 0.12);
+      border-radius: 2px;
+      background: rgba(10, 10, 10, 0.72);
+      backdrop-filter: blur(8px);
     }
 
     .player.visible { display: flex; }
@@ -488,8 +493,8 @@
         if (!analyser || !isPlaying) return;
 
         const bars = getSpectrumBars(kick);
-        const waveW = w * 0.88;
-        const maxH = Math.min(w, h) * (0.1 + kick * 0.22);
+        const waveW = w * 0.72;
+        const maxH = Math.min(w, h) * (0.045 + kick * 0.1);
         const startX = cx - waveW / 2;
         const step = waveW / (SPECTRUM_BARS - 1);
 
@@ -590,6 +595,7 @@
         const h = window.innerHeight;
         const cx = w / 2;
         const cy = h / 2;
+        const waveY = h * 0.78;
 
         ctx.clearRect(0, 0, w, h);
 
@@ -600,7 +606,7 @@
         const hitExpand = kick * Math.min(w, h) * 0.14;
         const pulseRadius = baseRadius + hitExpand;
 
-        drawFrequencyWaveform(cx, cy, w, h, kick);
+        drawFrequencyWaveform(cx, waveY, w, h, kick);
 
         if (kick > 0.02) {
           for (let i = 3; i >= 1; i--) {
@@ -745,15 +751,7 @@
         }
 
         startVisualizer();
-
-        try {
-          if (audioContext.state === 'suspended') await audioContext.resume();
-          await audioElement.play();
-          setPlayingUI(true);
-        } catch (e) {
-          showError('нажми ▶ — браузер требует клик для воспроизведения');
-          setPlayingUI(false);
-        }
+        setPlayingUI(false);
       }
 
       btnPlay.addEventListener('click', async () => {
