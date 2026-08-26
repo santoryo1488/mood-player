@@ -38,49 +38,87 @@
       inset: 0;
       pointer-events: none;
       z-index: 0;
+      overflow: hidden;
+    }
+
+    .fog-cloud {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(80px);
+      will-change: transform;
+      opacity: 0;
+      transition: opacity 1.4s ease;
+    }
+
+    .fog-cloud-a {
+      width: 52vmax;
+      height: 48vmax;
+      background: rgb(38, 40, 48);
+      top: -8%;
+      left: -12%;
+      animation: fog-a 52s ease-in-out infinite alternate;
+    }
+
+    body.player-active .fog-cloud-a { opacity: 0.045; }
+
+    .fog-cloud-b {
+      width: 44vmax;
+      height: 50vmax;
+      background: rgb(28, 36, 52);
+      bottom: -15%;
+      right: -8%;
+      animation: fog-b 64s ease-in-out infinite alternate;
+    }
+
+    body.player-active .fog-cloud-b { opacity: 0.04; }
+
+    .fog-cloud-c {
+      width: 38vmax;
+      height: 38vmax;
+      background: rgb(48, 30, 36);
+      top: 38%;
+      left: 42%;
+      animation: fog-c 58s ease-in-out infinite alternate;
+    }
+
+    body.player-active .fog-cloud-c { opacity: 0.035; }
+
+    @keyframes fog-a {
+      0%   { transform: translate3d(0, 0, 0) rotate(0deg); }
+      35%  { transform: translate3d(14vw, 10vh, 0) rotate(12deg); }
+      70%  { transform: translate3d(-8vw, 16vh, 0) rotate(-8deg); }
+      100% { transform: translate3d(10vw, -6vh, 0) rotate(5deg); }
+    }
+
+    @keyframes fog-b {
+      0%   { transform: translate3d(0, 0, 0) rotate(0deg); }
+      40%  { transform: translate3d(-12vw, -10vh, 0) rotate(-10deg); }
+      75%  { transform: translate3d(8vw, -14vh, 0) rotate(7deg); }
+      100% { transform: translate3d(-6vw, 8vh, 0) rotate(-4deg); }
+    }
+
+    @keyframes fog-c {
+      0%   { transform: translate3d(0, 0, 0) scale(1); }
+      45%  { transform: translate3d(-10vw, 6vh, 0) scale(1.12); }
+      100% { transform: translate3d(12vw, -8vh, 0) scale(0.92); }
     }
 
     .grain {
       position: absolute;
       inset: -50%;
-      opacity: 0.04;
+      opacity: 0.035;
+      z-index: 1;
       background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
       animation: grain-drift 8s steps(10) infinite;
     }
 
-    .fog {
-      position: absolute;
-      inset: 0;
-      background:
-        radial-gradient(ellipse 80% 60% at 30% 40%, rgba(20, 20, 25, 0.6) 0%, transparent 70%),
-        radial-gradient(ellipse 70% 50% at 70% 60%, rgba(15, 15, 20, 0.5) 0%, transparent 65%);
-      animation: fog-drift 28s ease-in-out infinite alternate;
-    }
-
-    .fog-2 {
-      position: absolute;
-      inset: 0;
-      background: radial-gradient(ellipse 90% 70% at 50% 50%, rgba(12, 12, 16, 0.4) 0%, transparent 60%);
-      animation: fog-drift-2 35s ease-in-out infinite alternate;
-    }
-
     @keyframes grain-drift {
-      0%, 100% { transform: translate(0, 0); }
-      10% { transform: translate(-2%, -3%); }
-      30% { transform: translate(3%, 1%); }
-      50% { transform: translate(-1%, 4%); }
-      70% { transform: translate(4%, -2%); }
-      90% { transform: translate(-3%, 2%); }
-    }
-
-    @keyframes fog-drift {
-      0% { transform: translate(0, 0) scale(1); opacity: 0.7; }
-      100% { transform: translate(4%, -3%) scale(1.08); opacity: 1; }
-    }
-
-    @keyframes fog-drift-2 {
-      0% { transform: translate(0, 0) scale(1.05); }
-      100% { transform: translate(-5%, 4%) scale(1); }
+      0%, 100% { transform: translate3d(0, 0, 0); }
+      10% { transform: translate3d(-2%, -3%, 0); }
+      30% { transform: translate3d(3%, 1%, 0); }
+      50% { transform: translate3d(-1%, 4%, 0); }
+      70% { transform: translate3d(4%, -2%, 0); }
+      90% { transform: translate3d(-3%, 2%, 0); }
     }
 
     #viz {
@@ -272,12 +310,28 @@
       align-items: center;
       justify-content: center;
       padding: 0;
+      border-radius: 50%;
+      position: relative;
       transition: color 0.25s;
     }
 
-    .volume-btn:hover { color: #d0d0d0; }
+    .volume-btn::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0);
+      transition: background 0.28s ease;
+    }
+
+    .volume-btn:hover::before,
+    .volume-wrap:focus-within .volume-btn::before {
+      background: rgba(255, 255, 255, 0.09);
+    }
 
     .volume-btn svg {
+      position: relative;
+      z-index: 1;
       width: 15px;
       height: 15px;
       stroke: currentColor;
@@ -320,6 +374,26 @@
       background: var(--fg-bright);
       border-radius: 1px;
       pointer-events: none;
+    }
+
+    .volume-thumb {
+      position: absolute;
+      top: 50%;
+      left: 85%;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--fg-bright);
+      box-shadow: 0 0 6px rgba(200, 200, 200, 0.25);
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.22s ease, left 0.06s linear;
+    }
+
+    .volume-wrap:hover .volume-thumb,
+    .volume-wrap:focus-within .volume-thumb {
+      opacity: 1;
     }
 
     .error-toast {
@@ -410,9 +484,10 @@
 </head>
 <body>
   <div class="atmosphere" aria-hidden="true">
+    <div class="fog-cloud fog-cloud-a"></div>
+    <div class="fog-cloud fog-cloud-b"></div>
+    <div class="fog-cloud fog-cloud-c"></div>
     <div class="grain"></div>
-    <div class="fog"></div>
-    <div class="fog-2"></div>
   </div>
 
   <canvas id="viz"></canvas>
@@ -460,6 +535,7 @@
         <div class="volume-track-wrap">
           <div class="volume-track" id="volume-track">
             <div class="volume-fill" id="volume-fill"></div>
+            <div class="volume-thumb" id="volume-thumb"></div>
           </div>
         </div>
       </div>
@@ -488,6 +564,7 @@
       const errorToast = document.getElementById('error-toast');
       const volumeTrack = document.getElementById('volume-track');
       const volumeFill = document.getElementById('volume-fill');
+      const volumeThumb = document.getElementById('volume-thumb');
       const iconVolume = document.getElementById('icon-volume');
       const iconMuted = document.getElementById('icon-muted');
       const canvas = document.getElementById('viz');
@@ -520,7 +597,9 @@
 
       function updateVolumeUI() {
         if (!volumeFill) return;
-        volumeFill.style.width = (volumeLevel * 100) + '%';
+        const pct = volumeLevel * 100;
+        volumeFill.style.width = pct + '%';
+        if (volumeThumb) volumeThumb.style.left = pct + '%';
         const muted = volumeLevel === 0;
         iconVolume.style.display = muted ? 'none' : 'block';
         iconMuted.style.display = muted ? 'block' : 'none';
@@ -843,6 +922,7 @@
         lastKickTime = 0;
         if (spectrumBars) spectrumBars.fill(0);
         changeTrack.classList.remove('visible');
+        document.body.classList.remove('player-active');
         setPlayingUI(false);
       }
 
@@ -885,6 +965,7 @@
         dropzone.classList.add('hidden');
         player.classList.add('visible');
         changeTrack.classList.add('visible');
+        document.body.classList.add('player-active');
 
         try {
           connectSource();
