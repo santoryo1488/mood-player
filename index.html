@@ -9,6 +9,9 @@
   <meta name="build-id" content="local">
   <title>mood player</title>
   <!-- build: local -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -20,6 +23,9 @@
       --accent: #4a4a4a;
       --line: rgba(120, 120, 120, 0.25);
       --glow: rgba(80, 80, 80, 0.15);
+      --neon: rgba(120, 200, 255, 0.55);
+      --neon-soft: rgba(90, 170, 240, 0.2);
+      --neon-dim: rgba(80, 150, 220, 0.12);
     }
 
     html, body {
@@ -128,6 +134,28 @@
       pointer-events: none;
     }
 
+    body.player-active #viz {
+      animation: waveform-neon 3.6s ease-in-out infinite;
+    }
+
+    @keyframes neon-pulse {
+      0%, 100% {
+        box-shadow:
+          0 0 6px var(--neon-dim),
+          0 0 12px rgba(80, 160, 230, 0.08);
+      }
+      50% {
+        box-shadow:
+          0 0 10px var(--neon-soft),
+          0 0 20px rgba(90, 180, 255, 0.16);
+      }
+    }
+
+    @keyframes waveform-neon {
+      0%, 100% { filter: drop-shadow(0 0 5px rgba(100, 180, 255, 0.12)); }
+      50% { filter: drop-shadow(0 0 12px rgba(110, 190, 255, 0.28)); }
+    }
+
     .ui {
       position: relative;
       z-index: 2;
@@ -198,14 +226,37 @@
     .player.visible { display: flex; }
 
     .track-name {
-      font-size: 0.7rem;
-      color: var(--fg-bright);
+      font-family: 'Orbitron', 'Segoe UI', sans-serif;
+      font-size: 0.72rem;
+      font-weight: 500;
+      color: #b8dcff;
       text-transform: lowercase;
       max-width: 100%;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
       text-align: center;
+      letter-spacing: 0.14em;
+      text-shadow:
+        0 0 6px rgba(100, 190, 255, 0.5),
+        0 0 14px rgba(80, 160, 230, 0.28),
+        0 0 2px rgba(200, 230, 255, 0.7);
+      animation: title-neon 4s ease-in-out infinite;
+    }
+
+    @keyframes title-neon {
+      0%, 100% {
+        text-shadow:
+          0 0 6px rgba(100, 190, 255, 0.45),
+          0 0 14px rgba(80, 160, 230, 0.22),
+          0 0 2px rgba(200, 230, 255, 0.65);
+      }
+      50% {
+        text-shadow:
+          0 0 8px rgba(110, 200, 255, 0.6),
+          0 0 18px rgba(90, 170, 240, 0.35),
+          0 0 3px rgba(210, 235, 255, 0.85);
+      }
     }
 
     .controls {
@@ -219,22 +270,23 @@
       flex-shrink: 0;
       width: 36px;
       height: 36px;
-      border: 1px solid var(--line);
+      border: 1px solid rgba(120, 170, 210, 0.35);
       border-radius: 50%;
       background: transparent;
-      color: var(--fg-bright);
+      color: #b8d8f0;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
-      transition: border-color 0.3s, box-shadow 0.3s;
+      transition: border-color 0.3s, color 0.3s;
       font-size: 0.65rem;
       letter-spacing: 0;
+      animation: neon-pulse 3.6s ease-in-out infinite;
     }
 
     .btn-play:hover {
-      border-color: rgba(140, 140, 140, 0.5);
-      box-shadow: 0 0 20px var(--glow);
+      border-color: rgba(140, 200, 255, 0.55);
+      color: #d0eaff;
     }
 
     .btn-play svg {
@@ -250,6 +302,7 @@
       background: var(--fg-dim);
       cursor: pointer;
       border-radius: 1px;
+      animation: neon-pulse 3.8s ease-in-out infinite;
     }
 
     .timeline-fill {
@@ -258,10 +311,11 @@
       top: 0;
       height: 100%;
       width: 0%;
-      background: var(--fg-bright);
+      background: #a8cce8;
       border-radius: 1px;
       pointer-events: none;
       transition: width 0.05s linear;
+      box-shadow: 0 0 8px rgba(100, 180, 255, 0.35);
     }
 
     .timeline-thumb {
@@ -363,6 +417,7 @@
       cursor: pointer;
       position: relative;
       border-radius: 1px;
+      animation: neon-pulse 4s ease-in-out infinite;
     }
 
     .volume-fill {
@@ -371,9 +426,10 @@
       top: 0;
       height: 100%;
       width: 85%;
-      background: var(--fg-bright);
+      background: #a8cce8;
       border-radius: 1px;
       pointer-events: none;
+      box-shadow: 0 0 6px rgba(100, 180, 255, 0.3);
     }
 
     .volume-thumb {
@@ -383,8 +439,8 @@
       width: 6px;
       height: 6px;
       border-radius: 50%;
-      background: var(--fg-bright);
-      box-shadow: 0 0 6px rgba(200, 200, 200, 0.25);
+      background: #c8e4ff;
+      box-shadow: 0 0 8px rgba(120, 200, 255, 0.45);
       transform: translate(-50%, -50%);
       pointer-events: none;
       opacity: 0;
@@ -430,12 +486,33 @@
       right: 0;
       padding: 0.85rem 1rem;
       text-align: center;
-      font-size: 0.55rem;
-      letter-spacing: 0.2em;
-      color: var(--fg-dim);
+      font-family: 'Orbitron', 'Segoe UI', sans-serif;
+      font-size: 0.58rem;
+      font-weight: 500;
+      letter-spacing: 0.28em;
+      color: rgba(170, 210, 245, 0.72);
       text-transform: lowercase;
       z-index: 2;
       pointer-events: none;
+      text-shadow:
+        0 0 8px rgba(100, 180, 255, 0.45),
+        0 0 16px rgba(80, 150, 220, 0.25);
+      animation: footer-neon 4.2s ease-in-out infinite;
+    }
+
+    @keyframes footer-neon {
+      0%, 100% {
+        color: rgba(165, 205, 240, 0.68);
+        text-shadow:
+          0 0 8px rgba(100, 180, 255, 0.4),
+          0 0 16px rgba(80, 150, 220, 0.2);
+      }
+      50% {
+        color: rgba(185, 220, 255, 0.82);
+        text-shadow:
+          0 0 10px rgba(110, 195, 255, 0.55),
+          0 0 22px rgba(90, 170, 240, 0.3);
+      }
     }
 
     .change-track {
@@ -746,13 +823,14 @@
         ctx.closePath();
 
         const fillAlpha = 0.06 + kick * 0.14;
-        ctx.fillStyle = `rgba(255, 255, 255, ${fillAlpha})`;
+        ctx.fillStyle = `rgba(180, 220, 255, ${fillAlpha})`;
         ctx.fill();
 
-        ctx.strokeStyle = `rgba(255, 255, 255, ${0.35 + kick * 0.55})`;
+        const pulse = 0.85 + Math.sin(performance.now() * 0.002) * 0.15;
+        ctx.strokeStyle = `rgba(190, 225, 255, ${0.35 + kick * 0.55})`;
         ctx.lineWidth = 1 + kick * 0.8;
-        ctx.shadowColor = `rgba(255, 255, 255, ${0.12 + kick * 0.35})`;
-        ctx.shadowBlur = 4 + kick * 18;
+        ctx.shadowColor = `rgba(110, 190, 255, ${(0.15 + kick * 0.35) * pulse})`;
+        ctx.shadowBlur = (4 + kick * 18) * pulse;
 
         ctx.beginPath();
         for (let i = 0; i < SPECTRUM_BARS; i++) {
@@ -790,7 +868,7 @@
           const alpha = isBass
             ? 0.2 + v * 0.55 + kick * 0.45
             : 0.08 + v * 0.35;
-          ctx.fillStyle = `rgba(255, 255, 255, ${Math.min(1, alpha)})`;
+          ctx.fillStyle = `rgba(190, 225, 255, ${Math.min(1, alpha)})`;
           ctx.fillRect(x, cy - bh, barW * 0.3, bh);
           ctx.fillRect(x, cy, barW * 0.3, bh);
         }
