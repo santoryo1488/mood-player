@@ -274,6 +274,35 @@
     }
 
     .change-track:hover { color: var(--fg); }
+
+    .btn-back {
+      display: none;
+      position: fixed;
+      top: 1.25rem;
+      left: 1.25rem;
+      z-index: 3;
+      padding: 0.55rem 1rem;
+      border: 1px solid var(--line);
+      border-radius: 2px;
+      background: rgba(10, 10, 10, 0.75);
+      backdrop-filter: blur(6px);
+      color: var(--fg-bright);
+      font-family: inherit;
+      font-size: 0.6rem;
+      font-weight: 300;
+      letter-spacing: 0.14em;
+      text-transform: lowercase;
+      cursor: pointer;
+      transition: border-color 0.3s, box-shadow 0.3s, color 0.3s;
+    }
+
+    .btn-back.visible { display: block; }
+
+    .btn-back:hover {
+      border-color: rgba(160, 160, 160, 0.45);
+      box-shadow: 0 0 24px var(--glow);
+      color: #d0d0d0;
+    }
   </style>
 </head>
 <body>
@@ -284,6 +313,8 @@
   </div>
 
   <canvas id="viz"></canvas>
+
+  <button class="btn-back" id="btn-back" type="button">← возврат</button>
 
   <div class="ui">
     <label class="dropzone" id="dropzone" for="file-input">
@@ -310,7 +341,6 @@
         <span id="time-current">0:00</span>
         <span id="time-duration">0:00</span>
       </div>
-      <button class="change-track" id="change-track">другой трек</button>
     </div>
   </div>
 
@@ -330,7 +360,7 @@
       const timelineThumb = document.getElementById('timeline-thumb');
       const timeCurrent = document.getElementById('time-current');
       const timeDuration = document.getElementById('time-duration');
-      const changeTrack = document.getElementById('change-track');
+      const changeTrack = document.getElementById('btn-back');
       const errorToast = document.getElementById('error-toast');
       const canvas = document.getElementById('viz');
       const ctx = canvas.getContext('2d');
@@ -346,9 +376,9 @@
       let kickEnvelope = 0;
       let bassAvg = 0;
       let lastKickTime = 0;
-      let volumeSmoothed = 0;
       let freqData = null;
-      let waveData = null;
+      let spectrumBars = null;
+      const SPECTRUM_BARS = 96;
       let errorTimeout = null;
 
       function showError(msg) {
@@ -398,11 +428,11 @@
       function setupAnalyser() {
         analyser = audioContext.createAnalyser();
         analyser.fftSize = 2048;
-        analyser.smoothingTimeConstant = 0.55;
-        analyser.minDecibels = -90;
-        analyser.maxDecibels = -10;
+        analyser.smoothingTimeConstant = 0.42;
+        analyser.minDecibels = -85;
+        analyser.maxDecibels = -8;
         freqData = new Uint8Array(analyser.frequencyBinCount);
-        waveData = new Uint8Array(analyser.fftSize);
+        spectrumBars = new Float32Array(SPECTRUM_BARS);
       }
 
       function connectSource() {
@@ -423,25 +453,119 @@
         return sum / (bassBins * 255);
       }
 
-      function getVolumeLevel() {
-        if (!analyser) return 0;
+      function getSpectrumBars(kick) {
+        if (!analyser) return spectrumBars;
 
-        analyser.getByteTimeDomainData(waveData);
+        analyser.getByteFrequencyData(freqData);
+        const binCount = freqData.length;
 
-        let sumSq = 0;
-        for (let i = 0; i < waveData.length; i++) {
-          const v = (waveData[i] - 128) / 128;
-          sumSq += v * v;
+        for (let i = 0; i < SPECTRUM_BARS; i++) {
+          const t0 = Math.pow(i / SPECTRUM_BARS, 1.85);
+          const t1 = Math.pow((i + 1) / SPECTRUM_BARS, 1.85);
+          const start = Math.floor(t0 * binCount);
+          const end = Math.max(start + 1, Math.floor(t1 * binCount));
+
+          let peak = 0;
+          for (let b = start; b < end; b++) peak = Math.max(peak, freqData[b] / 255);
+
+          const bassZone = i < SPECTRUM_BARS * 0.12;
+          const lowMidZone = i < SPECTRUM_BARS * 0.28;
+
+          if (bassZone) peak *= 2.2 + kick * 3.5;
+          else if (lowMidZone) peak *= 1.15 + kick * 0.35;
+
+          const target = Math.min(1, peak);
+          const rise = bassZone ? 0.72 : 0.5;
+          const fall = bassZone ? 0.18 : 0.14;
+          const speed = target > spectrumBars[i] ? rise : fall;
+          spectrumBars[i] += (target - spectrumBars[i]) * speed;
         }
-        const rms = Math.sqrt(sumSq / waveData.length);
 
-        let spectral = 0;
-        for (let i = 0; i < freqData.length; i++) spectral += freqData[i];
-        spectral /= freqData.length * 255;
+        return spectrumBars;
+      }
 
-        const level = Math.max(rms, spectral * 0.7);
-        volumeSmoothed += (level - volumeSmoothed) * 0.1;
-        return volumeSmoothed;
+      function drawFrequencyWaveform(cx, cy, w, h, kick) {
+        if (!analyser || !isPlaying) return;
+
+        const bars = getSpectrumBars(kick);
+        const waveW = w * 0.88;
+        const maxH = Math.min(w, h) * (0.1 + kick * 0.22);
+        const startX = cx - waveW / 2;
+        const step = waveW / (SPECTRUM_BARS - 1);
+
+        ctx.save();
+
+        function curveY(i, sign) {
+          return cy - sign * bars[i] * maxH;
+        }
+
+        ctx.beginPath();
+        ctx.moveTo(startX, cy);
+        for (let i = 0; i < SPECTRUM_BARS; i++) {
+          ctx.lineTo(startX + i * step, curveY(i, 1));
+        }
+        ctx.lineTo(startX + waveW, cy);
+        ctx.closePath();
+
+        ctx.beginPath();
+        ctx.moveTo(startX, cy);
+        for (let i = 0; i < SPECTRUM_BARS; i++) {
+          ctx.lineTo(startX + i * step, curveY(i, -1));
+        }
+        ctx.lineTo(startX + waveW, cy);
+        ctx.closePath();
+
+        const fillAlpha = 0.06 + kick * 0.14;
+        ctx.fillStyle = `rgba(255, 255, 255, ${fillAlpha})`;
+        ctx.fill();
+
+        ctx.strokeStyle = `rgba(255, 255, 255, ${0.35 + kick * 0.55})`;
+        ctx.lineWidth = 1 + kick * 0.8;
+        ctx.shadowColor = `rgba(255, 255, 255, ${0.12 + kick * 0.35})`;
+        ctx.shadowBlur = 4 + kick * 18;
+
+        ctx.beginPath();
+        for (let i = 0; i < SPECTRUM_BARS; i++) {
+          const x = startX + i * step;
+          const y = curveY(i, 1);
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+
+        ctx.beginPath();
+        for (let i = 0; i < SPECTRUM_BARS; i++) {
+          const x = startX + i * step;
+          const y = curveY(i, -1);
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+
+        ctx.shadowBlur = 0;
+        ctx.lineWidth = 0.5;
+        ctx.strokeStyle = `rgba(255, 255, 255, ${0.12 + kick * 0.2})`;
+        ctx.beginPath();
+        ctx.moveTo(startX, cy);
+        ctx.lineTo(startX + waveW, cy);
+        ctx.stroke();
+
+        const barW = waveW / SPECTRUM_BARS;
+        for (let i = 0; i < SPECTRUM_BARS; i++) {
+          const v = bars[i];
+          if (v < 0.04) continue;
+          const x = startX + i * barW + barW * 0.35;
+          const bh = v * maxH;
+          const isBass = i < SPECTRUM_BARS * 0.12;
+          const alpha = isBass
+            ? 0.2 + v * 0.55 + kick * 0.45
+            : 0.08 + v * 0.35;
+          ctx.fillStyle = `rgba(255, 255, 255, ${Math.min(1, alpha)})`;
+          ctx.fillRect(x, cy - bh, barW * 0.3, bh);
+          ctx.fillRect(x, cy, barW * 0.3, bh);
+        }
+
+        ctx.restore();
       }
 
       function detectKick(bass) {
@@ -461,53 +585,6 @@
         return kickEnvelope;
       }
 
-      function drawWaveform(cx, cy, w, h, kick, volume) {
-        if (!analyser || !isPlaying) return;
-
-        const waveW = w * 0.78;
-        const baseAmp = Math.min(w, h) * 0.055;
-        const amp = baseAmp * (0.55 + volume * 2.2 + kick * 0.45);
-        const startX = cx - waveW / 2;
-        const points = 120;
-        const slice = Math.floor(waveData.length / points);
-        const alpha = 0.16 + volume * 0.5 + kick * 0.2;
-
-        function sampleY(index) {
-          let avg = 0;
-          const start = index * slice;
-          for (let j = 0; j < slice; j++) avg += waveData[start + j];
-          return ((avg / slice) - 128) / 128;
-        }
-
-        function drawMirror(sign) {
-          ctx.beginPath();
-          for (let i = 0; i < points; i++) {
-            const x = startX + (i / (points - 1)) * waveW;
-            const y = cy + sampleY(i) * amp * sign;
-            if (i === 0) ctx.moveTo(x, y);
-            else ctx.lineTo(x, y);
-          }
-          ctx.stroke();
-        }
-
-        ctx.save();
-        ctx.strokeStyle = `rgba(125, 125, 130, ${alpha})`;
-        ctx.lineWidth = 0.8 + volume * 0.6 + kick * 0.5;
-        ctx.shadowColor = `rgba(110, 110, 120, ${0.15 + kick * 0.35})`;
-        ctx.shadowBlur = 6 + kick * 14;
-        drawMirror(1);
-        drawMirror(-1);
-
-        ctx.shadowBlur = 0;
-        ctx.strokeStyle = `rgba(85, 85, 90, ${0.08 + volume * 0.2})`;
-        ctx.lineWidth = 0.35;
-        ctx.beginPath();
-        ctx.moveTo(startX, cy);
-        ctx.lineTo(startX + waveW, cy);
-        ctx.stroke();
-        ctx.restore();
-      }
-
       function drawVisualizer() {
         const w = window.innerWidth;
         const h = window.innerHeight;
@@ -518,13 +595,12 @@
 
         const bass = isPlaying ? getBassLevel() : 0;
         const kick = isPlaying ? detectKick(bass) : 0;
-        const volume = isPlaying ? getVolumeLevel() : 0;
 
         const baseRadius = Math.min(w, h) * 0.12;
         const hitExpand = kick * Math.min(w, h) * 0.14;
         const pulseRadius = baseRadius + hitExpand;
 
-        drawWaveform(cx, cy, w, h, kick, volume);
+        drawFrequencyWaveform(cx, cy, w, h, kick);
 
         if (kick > 0.02) {
           for (let i = 3; i >= 1; i--) {
@@ -613,7 +689,8 @@
         kickEnvelope = 0;
         bassAvg = 0;
         lastKickTime = 0;
-        volumeSmoothed = 0;
+        if (spectrumBars) spectrumBars.fill(0);
+        changeTrack.classList.remove('visible');
         setPlayingUI(false);
       }
 
@@ -654,6 +731,7 @@
         trackName.textContent = file.name.replace(/\.[^.]+$/, '');
         dropzone.classList.add('hidden');
         player.classList.add('visible');
+        changeTrack.classList.add('visible');
 
         try {
           connectSource();
@@ -710,13 +788,15 @@
         if (seekDrag) { isSeeking = false; seekDrag = false; }
       });
 
-      changeTrack.addEventListener('click', () => {
+      function goBack() {
         cleanup();
         player.classList.remove('visible');
         dropzone.classList.remove('hidden');
         fileInput.value = '';
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-      });
+      }
+
+      changeTrack.addEventListener('click', goBack);
 
       dropzone.addEventListener('dragover', (e) => {
         e.preventDefault();
